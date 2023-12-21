@@ -34,6 +34,7 @@ async function run() {
 
         const usersCollection = client.db("taskManage").collection("users");
         const tasksCollection = client.db("taskManage").collection("tasks");
+        const notificationsCollection = client.db("taskManage").collection("notifications");
 
 
         //auth related api call
@@ -165,6 +166,30 @@ async function run() {
         })
 
 
+        //save notifications 
+        app.put('/notification/:id', async (req, res) => {
+            const id = req.params.id;
+            const notification = req.body;
+            const query = { taskId: id }
+            const options = { upsert: true }
+            const isExist = await notificationsCollection.findOne(query)
+            if (isExist) {
+                return res.send({ message: 'This notification already added.' })
+            }
+            const result = await notificationsCollection.insertOne(query,
+                {
+                    $set: { ...notification },
+                },
+                options);
+            res.send(result);
+        })
+
+        //get notifications 
+        app.get('/notifications/:email', async (req, res) => {
+            const email = req.params.email;
+            const result = await notificationsCollection.find({ email }).toArray();
+            res.send(result)
+        })
 
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
