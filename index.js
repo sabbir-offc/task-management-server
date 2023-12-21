@@ -105,6 +105,38 @@ async function run() {
             res.send(result);
         })
 
+        //update a single task 
+        app.put('/update-task/:id', async (req, res) => {
+            const id = req.params.id;
+            const task = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updatedTask = {
+                $set: {
+                    title: task.title,
+                    description: task.description,
+                    deadline: task.deadline,
+                    priority: task.priority
+                }
+            }
+            const result = await tasksCollection.updateOne(filter, updatedTask);
+            res.send(result);
+        })
+
+
+        //delete a task
+        app.delete('/deleteTask/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await tasksCollection.deleteOne(query);
+            res.send(result);
+        })
+        //get a single task data;
+        app.get('/task/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await tasksCollection.findOne(query);
+            res.send(result);
+        })
 
         //get all tasks 
         app.get('/tasks/:email', async (req, res) => {
@@ -113,7 +145,24 @@ async function run() {
             res.send(result)
         })
 
-
+        //update task status 
+        app.patch('/status/:id', async (req, res) => {
+            try {
+                const id = req.params.id;
+                const status = req.body.status;
+                const options = { upsert: true };
+                const filter = { _id: new ObjectId(id) };
+                const updatedTask = {
+                    $set: {
+                        status
+                    }
+                }
+                const result = await tasksCollection.updateOne(filter, updatedTask, options);
+                res.send(result);
+            } catch (error) {
+                res.send({ message: error.message })
+            }
+        })
 
 
 
