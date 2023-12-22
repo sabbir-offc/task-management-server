@@ -155,8 +155,8 @@ async function run() {
         })
 
         //get all tasks 
-        app.get('/tasks', async (req, res) => {
-            const email = req.query.email;
+        app.get('/tasks/:email', async (req, res) => {
+            const email = req.params.email;
             const result = await tasksCollection.find({ email }).toArray();
             res.send(result)
 
