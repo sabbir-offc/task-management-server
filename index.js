@@ -10,12 +10,27 @@ const port = process.env.PORT || 5000;
 
 // middleware 
 const corsOptions = {
-    origin: ['http://localhost:5173',],
+    origin: ['http://localhost:5173', "https://task-management-sb.web.app"],
     credentials: true,
 }
 app.use(cors(corsOptions))
 app.use(express.json())
 app.use(cookieParser())
+
+const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.token
+    if (!token) {
+        return res.status(401).send({ message: 'unauthorized access' })
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+        req.user = decoded
+        next()
+    })
+}
+
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(process.env.DB_URI, {
@@ -47,7 +62,7 @@ async function run() {
                 .cookie('token', token, {
                     httpOnly: true,
                     secure: true,
-                    sameSite: 'none'
+                    // sameSite: 'none'
                 })
                 .send({ success: true })
         })
@@ -100,14 +115,14 @@ async function run() {
         })
 
         //save a task
-        app.post('/task', async (req, res) => {
+        app.post('/task', verifyToken, async (req, res) => {
             const task = req.body;
             const result = await tasksCollection.insertOne(task);
             res.send(result);
         })
 
         //update a single task 
-        app.put('/update-task/:id', async (req, res) => {
+        app.put('/update-task/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const task = req.body;
             const filter = { _id: new ObjectId(id) };
@@ -125,14 +140,14 @@ async function run() {
 
 
         //delete a task
-        app.delete('/deleteTask/:id', async (req, res) => {
+        app.delete('/deleteTask/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await tasksCollection.deleteOne(query);
             res.send(result);
         })
         //get a single task data;
-        app.get('/task/:id', async (req, res) => {
+        app.get('/task/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await tasksCollection.findOne(query);
@@ -140,14 +155,15 @@ async function run() {
         })
 
         //get all tasks 
-        app.get('/tasks/:email', async (req, res) => {
-            const email = req.params.email;
+        app.get('/tasks', async (req, res) => {
+            const email = req.query.email;
             const result = await tasksCollection.find({ email }).toArray();
             res.send(result)
+
         })
 
         //update task status 
-        app.patch('/status/:id', async (req, res) => {
+        app.patch('/status/:id', verifyToken, async (req, res) => {
             try {
                 const id = req.params.id;
                 const status = req.body.status;
@@ -174,16 +190,37 @@ async function run() {
             const options = { upsert: true }
             const isExist = await notificationsCollection.findOne(query)
             if (isExist) {
-                return res.send({ message: 'This notification already added.' })
+                if (notification) {
+                    const result = await notificationsCollection.updateOne(
+                        query,
+                        {
+                            $set: notification,
+                        },
+                        options
+                    )
+                    return res.send(result)
+                } else {
+                    return res.send(isExist)
+                }
             }
-            const result = await notificationsCollection.insertOne(query,
+            const result = await notificationsCollection.updateOne(
+                query,
                 {
                     $set: { ...notification },
                 },
-                options);
-            res.send(result);
+                options
+            )
+            res.send(result)
         })
 
+
+        //delete a notification 
+        app.delete('/deleteNotification/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await notificationsCollection.deleteOne(query);
+            res.send(result);
+        })
         //get notifications 
         app.get('/notifications/:email', async (req, res) => {
             const email = req.params.email;
@@ -191,6 +228,13 @@ async function run() {
             res.send(result)
         })
 
+
+        //get a single user info
+        app.get('/user/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            const result = await usersCollection.findOne({ email });
+            res.send(result)
+        })
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
